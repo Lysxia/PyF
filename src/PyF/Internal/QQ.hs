@@ -123,12 +123,13 @@ padAndFormat (FormatMode padding tf grouping) = case tf of
                          |]
    where
      typeAllowed :: Q Type
-     typeAllowed = case padding of
-       PaddingDefault -> [t| EnableForString |]
-       Padding _ Nothing -> [t| EnableForString |]
-       Padding _ (Just (_, AnyAlign a)) -> case Formatters.getAlignForString a of
-         Nothing -> [t| DisableForString |]
-         Just _ -> [t| EnableForString |]
+     typeAllowed
+       | Padding _ (Just (_, AnyAlign a)) <- padding,
+         Nothing <- Formatters.getAlignForString a
+       = [t| DisableForString |]
+
+       | otherwise
+       = [t| EnableForString |]
 
   StringF prec -> [| Formatters.formatString pad (changePrec' prec) |]
     where pad = newPaddingForString padding
