@@ -90,29 +90,37 @@ changePrec' (Precision n) = Just (fromIntegral n)
 toGrp :: Maybe b -> a -> Maybe (a, b)
 toGrp mb a = (a,) <$> mb
 
+withCaps :: Caps -> Q Exp -> Q Exp
+withCaps Caps fmt = [| Formatters.Upper $fmt |]
+withCaps NoCaps fmt = fmt
+
 -- Todo: Alternates for floating
 padAndFormat :: FormatMode -> Q Exp
 padAndFormat (FormatMode padding tf grouping) = case tf of
   -- Integrals
-  BinaryF AlternateForm s -> [| formatAnyIntegral (Formatters.Alternate Formatters.Binary) s (newPadding padding) (toGrp grouping 4) |]
-  BinaryF NormalForm s -> [| formatAnyIntegral Formatters.Binary s (newPadding padding) (toGrp grouping 4) |]
+  IntegralF ity alt s ->
+    [| formatAnyIntegral $fmt s (newPadding padding) (toGrp grouping 4) |]
+    where
+      fmt = case alt of
+        AlternateForm -> [| Formatters.Alternate $fmtter |]
+        NormalForm -> fmtter
+      fmtter = case ity of
+        BinaryF -> [| Formatters.Binary |]
+        HexF caps -> withCaps caps [| Formatters.Hexa |]
+        OctalF -> [| Formatters.Octal |]
+
   CharacterF -> [| formatAnyIntegral Formatters.Character Formatters.Minus (newPadding padding) Nothing |]
   DecimalF s -> [| formatAnyIntegral Formatters.Decimal s (newPadding padding) (toGrp grouping 3) |]
-  HexF AlternateForm s -> [| formatAnyIntegral (Formatters.Alternate Formatters.Hexa) s (newPadding padding) (toGrp grouping 4) |]
-  HexF NormalForm s -> [| formatAnyIntegral Formatters.Hexa s (newPadding padding) (toGrp grouping 4) |]
-  OctalF AlternateForm s -> [| formatAnyIntegral (Formatters.Alternate Formatters.Octal) s (newPadding padding) (toGrp grouping 4) |]
-  OctalF NormalForm s -> [| formatAnyIntegral Formatters.Octal s (newPadding padding) (toGrp grouping 4) |]
-  HexCapsF AlternateForm s -> [| formatAnyIntegral (Formatters.Upper (Formatters.Alternate Formatters.Hexa)) s (newPadding padding) (toGrp grouping 4) |]
-  HexCapsF NormalForm s -> [| formatAnyIntegral (Formatters.Upper (Formatters.Hexa)) s (newPadding padding) (toGrp grouping 4) |]
 
   -- Floating
-  ExponentialF prec s -> [| formatAnyFractional (Formatters.Exponent) s (newPadding padding) (toGrp grouping 3) (changePrec prec) |]
-  ExponentialCapsF prec s -> [| formatAnyFractional (Formatters.Upper (Formatters.Exponent)) s (newPadding padding) (toGrp grouping 3) (changePrec prec) |]
-  GeneralF prec s -> [| formatAnyFractional (Formatters.Generic) s (newPadding padding) (toGrp grouping 3) (changePrec prec) |]
-  GeneralCapsF prec s -> [| formatAnyFractional (Formatters.Upper (Formatters.Generic)) s (newPadding padding) (toGrp grouping 3) (changePrec prec) |]
-  FixedF prec s -> [| formatAnyFractional (Formatters.Fixed) s (newPadding padding) (toGrp grouping 3) (changePrec prec) |]
-  FixedCapsF prec s -> [| formatAnyFractional (Formatters.Upper (Formatters.Fixed)) s (newPadding padding) (toGrp grouping 3) (changePrec prec) |]
-  PercentF prec s -> [| formatAnyFractional (Formatters.Percent) s (newPadding padding) (toGrp grouping 3) (changePrec prec) |]
+  FractionalF fty prec s ->
+    [| formatAnyFractional $fmt s (newPadding padding) (toGrp grouping 3) (changePrec prec) |]
+    where
+      fmt = case fty of
+        ExponentialF caps -> withCaps caps [| Formatters.Exponent |]
+        GeneralF caps -> withCaps caps [| Formatters.Generic |]
+        FixedF caps -> withCaps caps [| Formatters.Fixed |]
+        PercentF -> [| Formatters.Percent |]
 
   -- Default / String
   DefaultF prec s -> [| \v ->

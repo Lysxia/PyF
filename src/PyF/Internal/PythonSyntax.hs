@@ -111,23 +111,30 @@ type            ::=  "b" | "c" | "d" | "e" | "E" | "f" | "F" | "g" | "G" | "n" |
 data TypeFlag = Flagb | Flagc | Flagd | Flage | FlagE | Flagf | FlagF | Flagg | FlagG | Flagn | Flago | Flags | Flagx | FlagX | FlagPercent
   deriving (Show)
 
+data IntegralFormat =
+    BinaryF
+  | HexF Caps
+  | OctalF
+  deriving (Show)
+
+data FractionalFormat =
+    ExponentialF Caps
+  | FixedF Caps
+  | GeneralF Caps
+  | PercentF
+  deriving (Show)
+
+data Caps = Caps | NoCaps
+  deriving (Show)
+
 data TypeFormat =
     DefaultF Precision SignMode -- Default
-  | BinaryF AlternateForm SignMode -- Binary
   | CharacterF -- Character
   | DecimalF SignMode -- Decimal
-  | ExponentialF Precision {- AlternateForm -} SignMode -- exponential notation (Alt not handled)
-  | ExponentialCapsF Precision {- AlternateForm -} SignMode -- exponentiel notation CAPS (Alt not handled)
-  | FixedF Precision {- AlternateForm -} SignMode -- fixed point (Alt not handled)
-  | FixedCapsF Precision {- AlternateForm -} SignMode -- fixed point CAPS (Alt not handled)
-  | GeneralF Precision {- AlternateForm -} SignMode -- General (Alt Not Yet handled)
-  | GeneralCapsF Precision {- AlternateForm -} SignMode -- General Switch to E (Alt Not yet handled)
   -- | NumberF Precision AlternateForm SignMode -- Number (Not Yet handled)
-  | OctalF AlternateForm SignMode -- octal
   | StringF Precision -- string
-  | HexF AlternateForm SignMode -- small hex
-  | HexCapsF AlternateForm SignMode -- big hex
-  | PercentF Precision {- AlternateForm -} SignMode -- percent (Alt not handled)
+  | FractionalF FractionalFormat Precision {- AlternateForm -} SignMode
+  | IntegralF IntegralFormat AlternateForm SignMode
   deriving (Show)
 
 data AlternateForm = AlternateForm | NormalForm
@@ -175,21 +182,21 @@ format_spec = do
         lastCharFailed typeError
 
 evalFlag :: TypeFlag -> Precision -> AlternateForm -> Maybe SignMode -> Either String TypeFormat
-evalFlag Flagb prec alt s = failIfPrec prec (BinaryF alt (defSign s))
+evalFlag Flagb prec alt s = failIfPrec prec (IntegralF BinaryF alt (defSign s))
 evalFlag Flagc prec alt s = failIfS s =<< failIfPrec prec =<< failIfAlt alt CharacterF
 evalFlag Flagd prec alt s = failIfPrec prec =<< failIfAlt alt (DecimalF (defSign s))
-evalFlag Flage prec alt s = unhandledAlt alt (ExponentialF prec (defSign s))
-evalFlag FlagE prec alt s = unhandledAlt alt (ExponentialCapsF prec (defSign s))
-evalFlag Flagf prec alt s = unhandledAlt alt (FixedF prec (defSign s))
-evalFlag FlagF prec alt s = unhandledAlt alt (FixedCapsF prec (defSign s))
-evalFlag Flagg prec alt s = unhandledAlt alt (GeneralF prec (defSign s))
-evalFlag FlagG prec alt s = unhandledAlt alt (GeneralCapsF prec (defSign s))
+evalFlag Flage prec alt s = unhandledAlt alt (FractionalF (ExponentialF NoCaps) prec (defSign s))
+evalFlag FlagE prec alt s = unhandledAlt alt (FractionalF (ExponentialF   Caps) prec (defSign s))
+evalFlag Flagf prec alt s = unhandledAlt alt (FractionalF (FixedF NoCaps) prec (defSign s))
+evalFlag FlagF prec alt s = unhandledAlt alt (FractionalF (FixedF   Caps) prec (defSign s))
+evalFlag Flagg prec alt s = unhandledAlt alt (FractionalF (GeneralF NoCaps) prec (defSign s))
+evalFlag FlagG prec alt s = unhandledAlt alt (FractionalF (GeneralF   Caps) prec (defSign s))
 evalFlag Flagn _prec _alt _s = Left ("Type 'n' not handled (yet). " ++ errgGn)
-evalFlag Flago prec alt s = failIfPrec prec $ OctalF alt (defSign s)
+evalFlag Flago prec alt s = failIfPrec prec $ IntegralF OctalF alt (defSign s)
 evalFlag Flags prec alt s = failIfS s =<< (failIfAlt alt $ StringF prec)
-evalFlag Flagx prec alt s = failIfPrec prec $ HexF alt (defSign s)
-evalFlag FlagX prec alt s = failIfPrec prec $ HexCapsF alt (defSign s)
-evalFlag FlagPercent prec alt s = unhandledAlt alt (PercentF prec (defSign s))
+evalFlag Flagx prec alt s = failIfPrec prec $ IntegralF (HexF NoCaps) alt (defSign s)
+evalFlag FlagX prec alt s = failIfPrec prec $ IntegralF (HexF   Caps) alt (defSign s)
+evalFlag FlagPercent prec alt s = unhandledAlt alt (FractionalF PercentF prec (defSign s))
 
 defSign :: Maybe SignMode -> SignMode
 defSign Nothing = Minus
